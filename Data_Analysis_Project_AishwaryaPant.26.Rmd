@@ -1,0 +1,330 @@
+---
+title: "Variation in Sleep Behavior across Mammal Species"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(alr4)
+library(patchwork)
+library(broom)
+library(scatterplot3d)
+library(GGally)
+library(plotly)
+library(MASS)
+library(ggplot2)
+```
+
+### Introduction: 
+  I applied my knowledge on regression analysis to help understand how variation in sleep behavior across mammal species can be attributed to several species characteristics.
+
+"All known mammal species spend at least part of each day sleeping, some species sleeping more than others. Sleep must serve some biological function, but why do sleep requirements vary so much from species to species? One approach to gathering information that might help understand this question is to study the dependence of hours of sleep on species characteristics".(Cook and Weisberg, 1999) 
+
+### About The Data Set: 
+  The data set includes data on 51 different species from at least 13 different orders of mammals. The data set is adapted from the data set described in Allison and Cicchetti (1976) and includes the variables described in below. Each case in the data set represents a species of mammal; values of the variables for each mammal are average of characteristic values for the species.
+
+`Species`: species of mammal
+
+`TS`: Total sleep hrs/day
+
+`BodyWt`: Body weight in kilograms
+
+`BrainWt`: Brain weight in grams
+
+`Life`: Maximum life span in years
+
+`GP`: Gestation time in days
+
+`D`: Danger index, D1 = relatively low danger from other animals, ..., D5 = highest level of danger from other animals
+
+  
+
+### Part I: 
+I begin by doing an explanatory analysis of the data. I am interested in seeing how the response variables TS depends on the predictor variables. 
+
+```{r}
+# read in the dataset
+sleepdata <- read.csv("~/Downloads/sleepdata.csv")
+Orig_1 =  sleepdata %>% ggplot(aes(x = BodyWt, y = TS)) + geom_point(size = 0.5) + theme_bw(10)
+Orig_2 = sleepdata %>% ggplot(aes(x = BrainWt, y = TS)) + geom_point(size = 0.5) + theme_bw(10)
+Orig_3 = sleepdata %>% ggplot(aes(x = Life, y = TS)) + geom_point(size = 0.5) + theme_bw(10)
+Orig_4 = sleepdata %>% ggplot(aes(x = GP, y = TS)) + geom_point(size = 0.5) + theme_bw(10)
+
+Orig_1 + Orig_2 + Orig_3 + Orig_4 
+```
+
+Take a look at the plots of the predictor variables BodyWT, BrainWT, Life, and GP. It can be determined that the four predictor variables BodyWT, BrainWT, Life, GP must be transformed into log variables in order to make the plots for these more linear. As we can see with the original graph above the plots for these 4 predictor variables are nonlinear. By looking at the range of the variables it is determined that the predictor variables (BodyWT, BrainWT, Life, and GP) all range over more than one ranges of magnitude. For the response ,TS, variable the range is within one order of magnitude. The log rule clearly states that if the values of a variable range over more than one order of magnitude and the variables is strictly positive then we can replace the variables by its log. This is why we can replace the BodyWT, BrainWT, Life, and GP variables. However, since the response variable TS does not range over one order of magnitude it can not be change to a log variable. 
+
+```{r}
+sleepNew = sleepdata %>% mutate(logBodyWt = log(BodyWt), logBrainWt = log(BrainWt), logLife = log(Life), logGP = log(GP))
+sleepNew = sleepNew %>% dplyr::select(-BodyWt, -BrainWt, -Life, -GP, -species)
+```
+
+```{r echo = FALSE, fig.height = 4, fig.width = 6.5}
+colsx = which(colnames(sleepNew) %in% c("logBodyWt", "logBrainWt", "logLife", "logGP", "D"))
+colsy = which(colnames(sleepNew) %in% c("TS"))
+ggpairs(sleepNew, columns = c(colsx, colsy)) + theme_bw()
+```
+
+
+```{r}
+sleepdata %>% ggplot(aes(x = TS)) + 
+  geom_histogram( aes(y = ..density.., fill = D), color="black") +
+  facet_grid(D~.) + xlab("TS") + scale_fill_hue("D") + 
+  theme_bw(18) + labs(caption = "y-axis is density, not count")
+```
+
+I began by transforming the predictor variables `BodyWT`, `BrainWT`, `Life`, and `GP` into log predictor variables. By doing this the relationship between the predictor variables and the response variable `TS` goes from a nonlinear relationship to ones that look to be more linear.  . 
+
+D is a factor categorical variable, it can be ordered D1, D2, D3, D4, D5. If we break down the response variable (TS) for the sleep data grouped by the D factor variable. We will see as shown by the bar graph above that there is an average total sleep for animals that have a Danger index of 1, 2, 3, 4, and 5. Through the graph we can see that the average total sleep for animals decreases as the Danger index increases from 1 to 5. This means that animals with a higher danger index sleep on average less. So animals with D5 danger index on average sleep less than animals with a D4. Animals with a D4 danger index on average sleep less than animals with D3. Animals with D3 danger index on average sleep less than animals with D2. Animals with the D1 danger index on average sleep more than the other danger indexes. 
+
+Using the scatter plot matrix we are able to see the relationship between all the variables. There is a negatively associated relationships between the predictor variables (log(BodyWt), log(BrainWt), log(Life), log(GP), and D) and the response variable TS. This essentially means as body weight, brain weight, maximum life span, and gestation time increases the total sleep time for the animal decreases. There is a positive correlation between the predictor variables against each another. Essentially this says that as Body weight increases so does brain weight, maximum life span, and gestation time. And as Brain Weight increases so does Body weight, maximum life span, and gestation time. And so on for the other variables. So the predictor variables themselves are positively related to one another. As one predictor variable increases so do the others. 
+
+### Part II: 
+I am interested in understanding the adjusted relationships. I consider the full model that uses main effects for log(BodyWt), log(BrainWt), log(Life), log(GP) and the categorical variable D to predict TS.
+
+The statistical model is: $TS\stackrel{\rm}{\sim}log(BodyWT)+log(BrainWT)+log(Life)+log(GP)+D$
+
+We will use "Wilkinson- Rogers" Notation to refer to the models with main effects for D (Danger index). 
+$\beta_0 + \beta_1U_{D2} + \beta_2U_{D3} + \beta_3U_{D4} + \beta_4U_{D5}$
+
+$\hat \beta_1U_{D2}+\hat\beta_2U_{D3}+\hat \beta_3U_{D4}+\hat \beta_4U_{D5}$ are all the dummy variable created for the D categorical variable.
+
+so the main effects statistics model for `log(BodyWt)`, `log(BrainWt)`, `log(Life)`, `log(GP)` and the categorical variable `D` to predict `TS` is: 
+$\hat E(TS \mid GP,BrainWT,BodyWT,Life,D)=\hat\beta_0+\hat\beta_1U_{D2}+\hat\beta_2U_{D3}+\hat\beta_3U_{D4}+\hat\beta_4U_{D5}+\hat\beta_5log(GP)+\hat\beta_6log(BrainWT)+\hat\beta_7log(BodyWT)+\hat\beta_8log(Life)$
+
+
+The summary table provided below shows us all the estimations of the regression coefficients and standard errors, it also gives the test statistic and the p value. 
+```{r}
+sleepMod = lm(TS ~ D + log(GP) + log(BrainWt)+ log(BodyWt) + log(Life), data = sleepdata)
+
+summary(sleepMod)
+```
+
+I want to assess whether the categorical predictor D is useful in this full model. Therefore I perform a hypothesis test.
+
+The hypothesis test we are doing will remove the categorical variable D from the model to see if it is useful. 
+The hypothesis being tested is: 
+
+$H_0: \beta_1 = \beta_2 = \beta_3 = \beta_4 = 0$
+
+$H_1$ : At least one of the  $\beta_1, \beta_2, \beta_3, \beta_4$ is not equal to 0.
+
+We set $\beta_1, \beta_2, \beta_3, \beta_4$ all equal to 0 because we are looking at a reduced model with all effective D removed from the model. It wouldn't make sense to only set one dummy variable (for the categorical variable) to 0 because if we only set one equal to 0 that is just removing one of the levels of D from the model not the full effect of D. This is why my hypothesis is set the way it is above. 
+
+To do the hypothesis test we will calculate the F- statistic and the P-value of the F- statistic. 
+Formula of F- statistic is: 
+$\frac{(RSS_{NH} - RSS_{AH}) / (df_{NH} - df_{AH})}{(RSS_{AH} / df_{AH})}$ $\ge 0$
+
+The F- test statistic is always greater than or equal to 0. There should be a moderately large value of the F-statistic in order to indicate that there is a difference between the null and alternative hypothesis models. 
+
+
+$RSS_{NH}$: is the residual sum of squares under the null hypothesis (model without D as a predictor).
+
+$RSS_{AH}$: is the residual sum of squares under the alternative hypothesis (model including D as a predictor).
+
+$df_{NH}$: n- p
+
+$df_{AH}$: n - (p + q) = n - p - q
+
+$df_{NH}-df_{AH}$:The difference in degrees of freedom (also known as the numerator degrees of freedom) is just the number of additional regressor's, q, that are in the alternative model relative to the null hypothesis model. 
+
+If the null hypothesis is false we expect the ,$RSS_{AH}<<RSS_{NH}$, Residual Sum of Squares under the Alternative Hypothesis will be much less than the Residual Sum of Squares under the Null Hypothesis. When this happens ar large F value is seen, this is evidence against the null hypothesis. Next the P-value under the null should be calculated. The P- value is the probability of observing a test statistic larger than what is observed. We use the P- Value we calculate to determine if null hypothesis can be rejected or not. 
+
+Under the null model:
+```{r}
+null.model = lm(TS ~ log(GP) + log(BrainWt) + log(BodyWt) + 
+    log(Life), data = sleepdata)
+
+RSS.null = sum(resid(null.model)^2)
+RSS.null
+```
+```{r}
+df.null = null.model$df.residual
+df.null
+```
+
+Under the alternative model:
+```{r}
+alt.model = lm(TS ~ D * log(GP) + log(BrainWt) + log(BodyWt) + 
+    log(Life), data = sleepdata)
+
+RSS.alt = sum(resid(alt.model)^2)
+RSS.alt
+```
+```{r}
+df.alt = alt.model$df.residual
+df.alt
+```
+F statistic: 
+```{r}
+Fstat = ((RSS.null-RSS.alt) / (df.null-df.alt)) / (RSS.alt/df.alt)
+Fstat
+```
+P- Value:
+```{r}
+pf(Fstat, df1 = df.null - df.alt, df2 = df.alt, lower.tail = F)
+```
+In conclusion our null hypothesis was $H_0:\beta_1=\beta_2=\beta_3=\beta_4=0$ and we tested that against our alternative hypothesis, $H_1$ : At least one of the  $\beta_1,\beta_2,\beta_3,\beta_4$ is not equal to 0. We fit the two models and got our F- statistic = 4.937011. The corresponding P- value under the null hypothesis was, P- value = 0.000310935. So, we conclude that the data is not consistent with the null hypothesis and the categorical predictor D is useful.     
+
+3. Leaving `D` in the model, describe in sentence/paragraph form the relationship between the predictors `log(BodyWt)` and
+`log(BrainWt)` and the response `TS` in the context of the MLR model with all predictors. As part of your written answer, be 
+sure to address the following items/questions:
+
+    * Use the fitted model to provide confidence intervals for the individual coefficients for `log(BodyWt)` and `log(BrainWt)` 
+    and explain what they mean in terms of the context of the problem.
+
+    * Contrast your interpretation of the relationships between `log(BodyWt)` and `TS` (and also between `log(BrainWt)` and `TS`) 
+    under the multiple linear regression model with your description of the pairwise relationships from Part I. Describe how the
+    interpretations differ.
+
+We are going to look at the log(BodyWt) and fix the values of all the other predictor variables. In other words $\hat E(TS\mid BodyWt+1,BrainWt^*,GP^*,Life^*,D^*) - \hat E(TS\mid BodyWt,BrainWt^*,GP^*,Life^*,D^*$ (* just means we are fixing the value of these variables at something). When we simplify this expression down we will see that it simply equals $\hat\beta_1$.So, for 2 animals with the same number of estimated GP, BrainWt, Life, and D an increase of 1 kg in log(BodyWt) is associated with $\hat\beta_1$ 0.1012 additional hours of total sleep per day.
+
+For 2 animals with the same number of estimated GP, BodyWt, Life, and D an increase in 1 gram of BrainWt is associated with -0.7988 less hours of total sleep per day. 
+
+The 95% confidence interval for log(BrainWt) is (-2.2347959, 0.6372426). Essentially this means that for the animals, a 1 gram difference in brain weight is associated with a difference in average total sleep of between -2.2347959 and 0.6372426 hours (95% level of confidence).  The 95% confidence interval for log(BodyWt) is (-0.8528798  1.0552550). Essential this means that for the animals, a 1 kilogram difference in body weight is associated with a difference in average total sleep between -0.8528798 and 1.0552550 hours (95% level of confidence). 
+
+In the pairwise model from part 1 when looking at the graph I assumed that their was a negative linear relationship between BodyWt and TS as well as BrainWt and TS. Basically saying that as the brain weight increases total sleep decrease and as body weight increases total sleep decreases. Taking a look at our linear model we see that we come up with a different interpretation. In fact based on the linear model we see with an increase in body weight there is an increase in total sleep per day. However, with brain weight we do see that an increase in brain weight results in a decrease in total sleep per day.Which is what we saw with our pairwise model.   
+
+95% Confidence intervals of individual coefficients:
+```{r}
+confint(sleepMod, level = 0.95)
+```
+
+### Part III: 
+In this step I am looking for the best model to implement. Considering main effects only for `log(BodyWt)`, `log(BrainWt)`, `log(Life)`, `log(GP)` and the categorical variable `D`, use the `stepAIC` function in the `R` package `MASS` to implement forward selection and backward elimination to find a subset of the predictors that provides a good balance between model fit and model complexity.
+
+The idea behind forward selection is that we start with an empty model (null model: has no predictors only the intercept) and then incrementally make it into a bigger model. You only incrementally increase as long as making the model bigger does not make it a worse model. In backwards elimination the idea is the same, however, you are now instead starting with a full model and removing predictors one at a time until making the model any smaller makes the model worse instead of better. 
+
+Forward Selection and Backward Elimination: 
+```{r}
+null = lm(TS ~ 1, data = sleepNew)
+full = lm(TS ~ ., data = sleepNew)
+n = dim(sleepNew)[1]
+
+
+stepAIC(null, scope = list(upper = full), direction = "forward", k = 2)
+```
+Backwards Elimination:
+```{r}
+stepAIC(full, direction = "backward", k = 2)
+```
+
+I chose to do the AIC method for this problem. I also took a look at the BIC method, however, the results for both AIC and BIC are the same. I did both a backward and Forward AIC. If you look at the results above you can see the best models resulted from the backward elimination and forward selection. For Backwards elimination the model is $TS\stackrel{\rm}{\sim} D + logBrainWt + logGP$. For forward elimination the best model given to us was $TS\stackrel{\rm}{\sim} logGP + D + logBrainWt$. For both the backwards and forwards we see that the same predictor variables were used in the best model,so, the models are the same.Therefore, the model that provides a good balance between model fit and model complexity is the model that contains the 3 variables logGP, D, and logBrainWt. The mean function we get is $\hat E(TS \mid GP, BrainWT, D) = \hat \beta_0 + \hat \beta_1U_{D2} + \hat\beta_2U_{D3} + \hat \beta_3U_{D4} + \hat \beta_4U_{D5} + \hat \beta_5log(GP) + \hat \beta_6log(BrainWT)$. 
+
+
+### Part IV:
+Consider the the model that uses main effects for `log(BrainWt)`, `log(GP)` and the categorical variable `D` to predict sleep time. I will provide the appropriate plots of residuals to check the fit of the model. Use the plots to check whether the model assumptions seem reasonable, or whether I diagnose any lack of fit. 
+
+```{r}
+sleep.lm = lm(TS ~ D + logGP + logBrainWt, data = sleepNew)
+summary(sleep.lm)
+```
+```{r}
+base = augment(sleep.lm) %>% ggplot(aes(y = .resid)) + geom_point() + theme_bw() + ylab("residuals") + geom_hline(yintercept = 0)
+
+(base + aes(x = .fitted) + xlab("fitted values")) / ((base +aes(x= logBrainWt)) + (base + aes(x = logGP)) + (base + aes(x = D)))
+```
+
+I graphed the plots of the residuals $\hat e_i$ versus the fitted values $\hat y_i$ and the predictors $x_{ij}$. We are looking for plots of the residuals that have no discerning trend and there is no apparent change of variance. These are known as null plots. A trend or pattern in the residual plots indicate a lack of linearity. Looking at the residual plot for logBrainWt and logGP there doesn't seem to be any obvious trend remaining in the data. The residuals seem to be pretty equally spread around 0. Also when we look at the residual plots of logBrainWt and logGP the spread of the residuals is roughly equal so we can say that the constant variance assumption is met for these plots. These residuals are reasonable looking in terms of detecting evidence of any trend we may have missed. 
+
+For the residual plot of the D predictor variable we have points in a vertical line for each of the levels. The reason that this plot looks the way it does is because we are plotting the residual variables against a categorical predictor variable. The points on the plot, however, are still pretty equally spread around 0. However, the spread of the residuals does not seem to be roughly equal at each level of D. There looks to be less residuals at the D5 level as compared to D1. So, this means that the constant variance assumption may not be met. If the constant variance assumption is not met that means the residuals for the D plot suffer from heteroscedasticity. This essentially means that there may be some trend for the D residuals we may have missed. If we look at the residual plot of fitted values we see the heteroscedasticity a lot more obviously. The residuals are less concentrated at the lower fitted values and more concentrated at the higher fitted values. So, though the values are centered around 0 we see evidence that the constant variance assumption was not met. There are ways to fix the violation of the constant variance, most commonly you would transform the response variable. 
+
+### Part V:
+Summary of the model.
+
+In the model $TS\stackrel{\rm}{\sim} log(GP) + log(BrainWt) + D$ the estimated regression coefficients are $\hat \beta_0 = 21.2179,\hat \beta_1 = -2.1651,\hat \beta_2 = -4.7433 , \hat \beta_3 = -3.2938 , \hat \beta_4 = -7.1699 , \hat \beta_5 = -1.4219, \hat \beta_6 = -0.5319$. Essentially this means for a given animal each additional g of BrainWt is associated with total sleep per day that is 41% lower. I got the 41% by doing $(e^{-0.5319}-1) * 100$. This also means that for a given animal each additional day of gestation time is associated with total sleep per day that is $(e^{-1.4219}-1) * 100$ = 75% lower. 
+
+`Effects plot for BrainWt:`
+```{r}
+sleepMod = lm(TS ~ D + log(GP) + log(BrainWt), data = sleepdata)
+
+GPFix = 320
+
+# Grid of points for GP over the observed range
+BrainWtgrid = seq(from = 0.005, to = 6654, length.out = 100)
+# Fitted values when  GP = GPFix and D = 1
+yhatD1 = predict(sleepMod, newdata = data.frame(D= "D1",
+                                                GP = GPFix, 
+                                                BrainWt = BrainWtgrid))
+# Fitted values when  GP = GPFix and D = 2
+yhatD2 = predict(sleepMod, newdata = data.frame(D= "D2",
+                                                GP = GPFix, 
+                                                BrainWt = BrainWtgrid))
+# Fitted values when  GP = GPFix and D = 3
+yhatD3 = predict(sleepMod, newdata = data.frame(D= "D3",
+                                                GP = GPFix, 
+                                                BrainWt = BrainWtgrid))
+# Fitted values when  GP = GPFix and D = 4
+yhatD4 = predict(sleepMod, newdata = data.frame(D= "D4",
+                                                GP = GPFix, 
+                                                BrainWt = BrainWtgrid))
+# Fitted values when  GP = GPFix and D = 5
+yhatD5 = predict(sleepMod, newdata = data.frame(D= "D5",
+                                                GP = GPFix, 
+                                                BrainWt = BrainWtgrid))
+
+plot(BrainWtgrid, yhatD1, type ="l", xlab = "BrainWt", ylab = "Estimated Average Sleep Time", 
+     ylim = c(0,20))
+lines(BrainWtgrid, yhatD2, col = 2)
+lines(BrainWtgrid, yhatD3, col = 3)
+lines(BrainWtgrid, yhatD4, col = 4)
+lines(BrainWtgrid, yhatD5, col = 5)
+
+legend(x = "topright", legend = c("D1", "D2", "D3", "D4", "D5"), fill = c(1, 2, 3, 4, 5))
+
+```
+
+The Effects plot for the BrainWt predictor variable has 5 curves each of which corresponds to the different fixed D level.The plot shows that as the predictor variable Brain weight increases there is a decrease in the response, estimated average sleep time. The decrease depends on the level of D. All of the curves are decreasing at the same rate but where the curve starts differs depending on the level of D. If we increase the value of the fixed GP the starting point of all the curves reduce, however, they still continue to decrease at the same rate. If we decrease the value of the fixed GP the starting points of all the curves increase, they still continue to decrease at the same rate. So, we can say that as Brain Weight increases at a fixed value of gestation period the curve at each level of D decreases. The starting point for each curve of different D values depends on what value we fix the gestation period at. The higher the gestation period the lower the start value of the curves.        
+
+`Effects Plot for GP:`
+```{r}
+BrainWtFix = 317.15
+
+# Grid of points for GP over the observed range
+GPgrid = seq(from = 12, to = 645, length.out = 100)
+# Fitted values when  BrainWt = BrainWtFix and D = 1
+yhatD1 = predict(sleepMod, newdata = data.frame(D= "D1",
+                                                BrainWt = BrainWtFix, 
+                                                GP = GPgrid))
+# Fitted values when  BrainWt = BrainWtFix and D = 2
+yhatD2 = predict(sleepMod, newdata = data.frame(D= "D2",
+                                                BrainWt = BrainWtFix, 
+                                                GP = GPgrid))
+# Fitted values when  BrainWt = BrainWtFix and D = 3
+yhatD3 = predict(sleepMod, newdata = data.frame(D= "D3",
+                                                BrainWt = BrainWtFix, 
+                                                GP = GPgrid))
+# Fitted values when  BrainWt = BrainWtFix and D = 4
+yhatD4 = predict(sleepMod, newdata = data.frame(D= "D4",
+                                                BrainWt = BrainWtFix, 
+                                                GP = GPgrid))
+# Fitted values when  BrainWt = BrainWtFix and D = 5
+yhatD5 = predict(sleepMod, newdata = data.frame(D= "D5",
+                                                BrainWt = BrainWtFix, 
+                                                GP = GPgrid))
+plot(GPgrid, yhatD1, type ="l", xlab = "GP", ylab = "Estimated Average Sleep Time", 
+     ylim = c(0,20))
+lines(GPgrid, yhatD2, col = 2)
+lines(GPgrid, yhatD3, col = 3)
+lines(GPgrid, yhatD4, col = 4)
+lines(GPgrid, yhatD5, col = 5)
+
+legend(x = "topright", legend = c("D1", "D2", "D3", "D4", "D5"), fill = c(1, 2, 3, 4, 5))
+```
+
+The Effects plot for the GP predictor variable has 5 curves each of which corresponds to the different fixed D level.The plot shows that as GP increases here is a decrease in the response estimated average sleep time. The decrease depends on the level D. All of the curves are decreasing at the same rate but where each curve starts differs depending on the level of D. If we increase the value of the fixed BrainWt the starting point of all the curves reduces, however, they still continue to decrease at the same rate. If we decrease the value of the fixed BrainWt the starting points of all the curves increase, they still continue to decrease at the same rate. So, we can say that as gestation period increases at a fixed value of brain weight the curve at each level of D decreases. The starting point for each curve of different D levels depends on what value we fix the brain weight at. The higher the brain weight the lower the start value of the curves.        
+
+
+
+
+---
+
+### References
+
+Allison, T. and Cicchetti, D. (1976). Sleep in mammals: Ecological and constitutional
+correlates. *Science*, 194, 732--734.
+
+Cook, R. D. and Wesiberg, S. (1999). *Applied regression including computing and
+graphics*. John Wiley \& Sons.
